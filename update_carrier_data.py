@@ -2,13 +2,13 @@
 """
 통신사 단가표 이미지 → 엑셀 자동 업데이트 스크립트
 
-이미지에서 SKT/KT/LG 끝단가·공시지원금 데이터를 추출하여
+이미지에서 SKT/KT/LG 끝단가·부가서비스·정책 차감 데이터를 추출하여
 엑셀 템플릿의 아래 시트들을 자동으로 업데이트합니다.
 
   ▸ 입력용           : SKT·KT·LG 공통지원금, MNP지원금 (원 단위)
-  ▸ SK합산단가입력    : MNP 공시/선약 끝단가, 기변 공시/선약 끝단가 (만원 단위)
-  ▸ KT 합산단가입력   : 같은 구조
-  ▸ LG 합산단가입력   : 같은 구조
+  ▸ SK합산단가입력    : 끝단가, 유통지원금, 공통추가, 부가서비스 (MNP·기변)
+  ▸ KT 합산단가입력   : 끝단가, 유통지원금, S26정책, 부가추가, 저가MNP (MNP·기변)
+  ▸ LG 합산단가입력   : 끝단가, 유통지원금, 담당정책, 777연합, 부가추가 (MNP·기변)
 
 사용법:
     python update_carrier_data.py <이미지1> [이미지2 ...] -t <템플릿.xlsx> [-o <출력.xlsx>]
@@ -36,7 +36,7 @@ import openpyxl
 # ─────────────────────────────────────────────
 
 EXTRACT_PROMPT = """이 이미지는 통신사(SKT/KT/LG U+) 휴대폰 단가표입니다.
-아래 JSON 형식으로 데이터를 추출해 주세요.
+아래 JSON 형식으로 데이터를 빠짐없이 추출해 주세요.
 
 반환 형식:
 {
@@ -45,32 +45,88 @@ EXTRACT_PROMPT = """이 이미지는 통신사(SKT/KT/LG U+) 휴대폰 단가표
       "models": [
         {
           "name": "모델명 (이미지에 표기된 그대로)",
-          "mnp_gongsi": 63,       // 번호이동 공시 끝단가 (만원). 없으면 null
-          "mnp_seonyak": 53,      // 번호이동 선약 끝단가 (만원). 없으면 null
-          "gibyon_gongsi": 33,    // 기기변경 공시 끝단가 (만원). 없으면 null
-          "gibyon_seonyak": 23,   // 기기변경 선약 끝단가 (만원). 없으면 null
-          "gongsi_jiwon": 450000  // 공시지원금 원 단위. 없으면 null
+
+          // ── 번호이동(MNP) ──
+          "mnp_gongsi": 63,        // 공시 끝단가 (만원). 없으면 null
+          "mnp_seonyak": 53,       // 선약 끝단가 (만원). 없으면 null
+          "mnp_yutong": 5,         // 유통지원금 20이상 (만원). 없으면 null
+          "mnp_gongtong": null,    // 공통추가지원금 (만원). 없으면 null
+          "mnp_buga": null,        // 부가서비스 차감 (만원). 없으면 null
+
+          // ── 기기변경(기변) ──
+          "gibyon_gongsi": 33,     // 공시 끝단가 (만원). 없으면 null
+          "gibyon_seonyak": 23,    // 선약 끝단가 (만원). 없으면 null
+          "gibyon_yutong": 5,      // 유통지원금 20이상 (만원). 없으면 null
+          "gibyon_gongtong": null, // 공통추가지원금 (만원). 없으면 null
+          "gibyon_buga": null,     // 부가서비스 차감 (만원). 없으면 null
+
+          // ── 공시지원금 (입력용 시트) ──
+          "gongsi_jiwon": null     // 공시지원금 원 단위 (예: 450000). 없으면 null
         }
       ]
     },
-    "KT": { "models": [...] },
-    "LGU": { "models": [...] }
+    "KT": {
+      "models": [
+        {
+          "name": "모델명",
+
+          // ── 번호이동(MNP) ──
+          "mnp_gongsi": 41,          // 공시 끝단가 (만원)
+          "mnp_yutong": 3,           // 유통지원금 20이상 (만원)
+          "mnp_s26_yeayak": null,    // S26 예약접수 추가 (만원)
+          "mnp_s26_daeeung": null,   // S26 대응정책 추가 (만원)
+          "mnp_buga": 4,             // 부가추가 차감 (만원)
+          "mnp_jeokga_mnp": null,    // 저가MNP 구두지원 (만원)
+
+          // ── 기기변경(기변) ──
+          "gibyon_gongsi": 48,       // 공시 끝단가 (만원)
+          "gibyon_yutong": 3,        // 유통지원금 20이상 (만원)
+          "gibyon_s26_daeeung": null,// S26 대응정책 추가 (만원)
+          "gibyon_buga": 4,          // 부가추가 차감 (만원)
+
+          "gongsi_jiwon": null
+        }
+      ]
+    },
+    "LGU": {
+      "models": [
+        {
+          "name": "모델명",
+
+          // ── 번호이동(MNP) ──
+          "mnp_gongsi": 53,          // 공시 끝단가 (만원)
+          "mnp_yutong": 3,           // 유통망지원금 20이상 (만원)
+          "mnp_13si": null,          // 13시(2시) 이후 추가 (만원)
+          "mnp_damdang": null,       // 담당정책 추가 (만원)
+          "mnp_777": 5,              // 777연합 추가 (만원)
+          "mnp_buga": 6,             // 부가추가 차감 (만원)
+
+          // ── 기기변경(기변) ──
+          "gibyon_gongsi": 60,       // 공시 끝단가 (만원)
+          "gibyon_yutong": 3,        // 유통망지원금 20이상 (만원)
+          "gibyon_s26_early": null,  // S26 사전예약/얼리 추가 (만원)
+          "gibyon_damdang": null,    // 담당정책 추가 (만원)
+          "gibyon_777": 5,           // 777연합 추가 (만원)
+          "gibyon_buga": 6,          // 부가추가 차감 (만원)
+
+          "gongsi_jiwon": null
+        }
+      ]
+    }
   }
 }
 
 주의사항:
-- 이미지에 없는 통신사는 키를 포함하지 마세요 (예: SKT 전용 이미지면 SKT만 포함).
-- 끝단가(고객 지불금)와 공시지원금(할인금)을 구분하세요.
-  · 끝단가: 고객이 실제 내는 금액 (예: 63만원 = 63)
-  · 공시지원금: 보조금 금액 (예: 450,000원 = 450000)
-- 금액이 명확하지 않은 셀은 null로 표기하세요.
-- "신규" 컬럼이 있으면 무시하고 MNP/기변만 추출하세요.
-- 숫자만 반환 (단위 제외). 예: "63만원" → 63, "450,000" → 450000
+- 이미지에 없는 통신사 키는 포함하지 마세요.
+- 끝단가(고객 지불금, 만원)와 공시지원금(보조금, 원)을 구분하세요.
+  · 끝단가: 고객이 내는 금액 (예: 63만원 → 63)
+  · 공시지원금: 할인 보조금 (예: 450,000원 → 450000)
+- 유통지원금·부가서비스·정책 금액은 모두 만원 단위입니다.
+- 이미지에 값이 없거나 불명확한 필드는 반드시 null로 표기하세요.
+- "신규" 컬럼은 무시하고 MNP/기변만 추출하세요.
 - JSON 외의 텍스트를 절대 출력하지 마세요.
 
-모델명 표기 기준:
-- 이미지의 표기를 최대한 그대로 유지하세요 (예: "갤럭시 S26", "아이폰17", "Z플립7")
-- 용량 표기가 있으면 그대로 포함 (예: "256G", "128G")
+모델명: 이미지 표기 그대로 유지 (예: "갤럭시 S26", "아이폰17 에어 256G")
 """
 
 
@@ -172,11 +228,52 @@ CARRIER_SHEET_MAP = {
 }
 
 # 각 캐리어 시트의 업데이트 대상 열 인덱스 (0-based)
-# D=3, E=4, M=12, N=13
+# 수식 셀은 제외: SKT E(4)/KT E(4)O(14)/LGU E(4)P(15) 등
 CARRIER_COLS = {
-    "SKT": {"mnp_gongsi": 3, "mnp_seonyak": 4, "gibyon_gongsi": 12, "gibyon_seonyak": 13},
-    "KT":  {"mnp_gongsi": 3,                    "gibyon_seonyak": 13},   # E=D수식, M없음
-    "LGU": {"mnp_gongsi": 3},                                            # E=D-1수식
+    "SKT": {
+        # 번호이동
+        "mnp_gongsi":   3,   # D: MNP 공시 끝단가
+        "mnp_seonyak":  4,   # E: MNP 선약 끝단가
+        "mnp_yutong":   5,   # F: MNP 유통지원금 20이상
+        "mnp_gongtong": 6,   # G: MNP 공통추가지원금
+        "mnp_buga":     8,   # I: MNP 부가서비스
+        # 기기변경
+        "gibyon_gongsi":   12,  # M: 기변 공시 끝단가
+        "gibyon_seonyak":  13,  # N: 기변 선약 끝단가
+        "gibyon_yutong":   14,  # O: 기변 유통지원금 20이상
+        "gibyon_gongtong": 15,  # P: 기변 공통추가지원금
+        "gibyon_buga":     17,  # R: 기변 부가서비스
+    },
+    "KT": {
+        # 번호이동 (E=D수식이라 D만 업데이트)
+        "mnp_gongsi":      3,   # D: MNP 공시 끝단가
+        "mnp_yutong":      5,   # F: MNP 유통지원금
+        "mnp_s26_yeayak":  6,   # G: S26 예약접수 추가
+        "mnp_s26_daeeung": 7,   # H: S26 대응정책 추가
+        "mnp_buga":        8,   # I: MNP 부가추가
+        "mnp_jeokga_mnp":  9,   # J: 저가MNP 구두지원
+        # 기기변경 (O=N수식이라 N만 업데이트)
+        "gibyon_gongsi":      13,  # N: 기변 공시 끝단가
+        "gibyon_yutong":      15,  # P: 기변 유통지원금
+        "gibyon_s26_daeeung": 17,  # R: 기변 S26 대응정책 추가
+        "gibyon_buga":        18,  # S: 기변 부가추가
+    },
+    "LGU": {
+        # 번호이동 (E=D-1수식이라 D만 업데이트)
+        "mnp_gongsi":  3,   # D: MNP 공시 끝단가
+        "mnp_yutong":  5,   # F: MNP 유통망지원금
+        "mnp_13si":    7,   # H: 13시(2시) 이후 추가
+        "mnp_damdang": 8,   # I: MNP 담당정책 추가
+        "mnp_777":     9,   # J: MNP 777연합 추가
+        "mnp_buga":    10,  # K: MNP 부가추가
+        # 기기변경 (P=O-1수식이라 O만 업데이트)
+        "gibyon_gongsi":    14,  # O: 기변 공시 끝단가
+        "gibyon_yutong":    16,  # Q: 기변 유통망지원금
+        "gibyon_s26_early": 17,  # R: 기변 S26 사전예약/얼리
+        "gibyon_damdang":   18,  # S: 기변 담당정책 추가
+        "gibyon_777":       19,  # T: 기변 777연합 추가
+        "gibyon_buga":      20,  # U: 기변 부가추가
+    },
 }
 
 # 입력용 시트 — 공시지원금·MNP추가지원금 열 (0-based)
@@ -268,8 +365,16 @@ def update_excel(wb: openpyxl.Workbook, all_extracted: list[dict],
                         for field, col_idx in col_map.items():
                             val = item.get(field)
                             if val is not None:
-                                old = ws.cell(row=row_num, column=col_idx + 1).value
-                                ws.cell(row=row_num, column=col_idx + 1).value = val
+                                cell = ws.cell(row=row_num, column=col_idx + 1)
+                                old = cell.value
+                                # 수식 셀은 건드리지 않음
+                                if isinstance(old, str) and old.startswith("="):
+                                    log.append(
+                                        f"[{sheet_name}] 행{row_num} {matched} | "
+                                        f"{field}: 수식 셀 스킵 ({old})"
+                                    )
+                                    continue
+                                cell.value = val
                                 log.append(
                                     f"[{sheet_name}] 행{row_num} {matched} | "
                                     f"{field}: {old} → {val}"
