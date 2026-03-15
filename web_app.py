@@ -15,6 +15,9 @@ import tempfile
 import threading
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv()  # 프로젝트 루트의 .env 파일 자동 로드
+
 import anthropic
 import openpyxl
 from fastapi import FastAPI, File, UploadFile, HTTPException
@@ -53,7 +56,11 @@ def _run(job_id: str, image_paths: list[str], template_path: str) -> None:
     try:
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.")
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY가 설정되지 않았습니다.\n"
+                "프로젝트 폴더에 .env 파일을 만들고 아래 내용을 입력하세요:\n"
+                "  ANTHROPIC_API_KEY=sk-ant-..."
+            )
 
         client = anthropic.Anthropic(api_key=api_key)
 
