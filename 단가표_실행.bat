@@ -10,11 +10,16 @@ if errorlevel 1 (
 )
 
 if not exist ".env" (
-    echo ANTHROPIC_API_KEY=sk-ant-여기에_API키_입력> .env
-    echo .env file created. Opening for editing...
-    notepad .env
-    echo After saving, press any key to continue...
-    pause >nul
+    echo.
+    echo ----------------------------------------
+    echo  API key not found.
+    echo  Enter your Anthropic API key below:
+    echo  (starts with sk-ant-...)
+    echo ----------------------------------------
+    set /p APIKEY=API Key:
+    echo ANTHROPIC_API_KEY=%APIKEY%> .env
+    echo .env file created.
+    echo.
 )
 
 echo [2/3] Starting server...
