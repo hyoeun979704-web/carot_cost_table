@@ -132,7 +132,7 @@ EXTRACT_PROMPT = """이 이미지는 통신사(SKT/KT/LG U+) 휴대폰 단가표
 
 def analyze_image(image_path: str) -> dict:
     print(f"  → 분석: {image_path}")
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash")
     img = Image.open(image_path)
     response = model.generate_content([img, EXTRACT_PROMPT])
     text = response.text.strip()
