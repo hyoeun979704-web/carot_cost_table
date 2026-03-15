@@ -179,38 +179,38 @@ def normalize(name: str) -> str:
     s = _NORM_RE.sub("", name).lower()
     s = _CAP_RE.sub(lambda m: m.group(1) + "g", s)
     # 브랜드 별칭 통일
-    s = s.replace("갤럭시", "galaxy").replace("galaxy", "galaxy")
-    s = s.replace("아이폰", "iphone").replace("iphone", "iphone")
+    s = s.replace("갤럭시", "galaxy")
+    s = s.replace("아이폰", "iphone")
     s = s.replace("pro", "프로").replace("max", "맥스").replace("plus", "+")
     s = s.replace("ultra", "울트라").replace("air", "에어")
     s = s.replace("edge", "엣지").replace("flip", "플립").replace("fold", "폴드")
     return s
 
 
-def best_match(img_name: str, excel_names: list[str]) -> str | None:
+def best_match(img_name: str, excel_names) -> str | None:
     """img_name 과 가장 유사한 excel_names 항목 반환. 없으면 None."""
     nimg = normalize(img_name)
+    # 정규화 결과를 한 번만 계산
+    normed = [(en, normalize(en)) for en in excel_names]
 
     # 1) 완전 일치
-    for en in excel_names:
-        if normalize(en) == nimg:
+    for en, nen in normed:
+        if nen == nimg:
             return en
 
     # 2) 이미지명이 엑셀명의 부분집합인 경우 (용량 생략 등)
-    for en in excel_names:
-        nen = normalize(en)
+    for en, nen in normed:
         if nimg in nen or nen in nimg:
             return en
 
     # 3) 공통 토큰 기반 유사도
     img_tokens = set(re.findall(r"[가-힣a-z0-9]+", nimg))
     best_score, best_en = 0, None
-    for en in excel_names:
-        en_tokens = set(re.findall(r"[가-힣a-z0-9]+", normalize(en)))
+    for en, nen in normed:
+        en_tokens = set(re.findall(r"[가-힣a-z0-9]+", nen))
         if not en_tokens:
             continue
-        common = img_tokens & en_tokens
-        score = len(common) / max(len(img_tokens), len(en_tokens))
+        score = len(img_tokens & en_tokens) / max(len(img_tokens), len(en_tokens))
         if score > best_score:
             best_score, best_en = score, en
 
@@ -295,32 +295,25 @@ def load_excel_model_rows(wb: openpyxl.Workbook) -> dict:
         "LG 합산단가입력":  {...},
       }
     """
-    result = {}
-
-    # 입력용: C열(인덱스2), 13~59행
-    ws = wb["입력용"]
-    mapping = {}
-    for row in ws.iter_rows(min_row=13, max_row=59):
-        cell = row[2]
-        val = cell.value
-        if val and isinstance(val, str) and not val.startswith("=") and val != "모델명":
-            mapping[val] = cell.row
-    result["입력용"] = mapping
-
-    # 캐리어 합산단가 시트: C열(인덱스2), 8~50행
-    for carrier, sheet_name in CARRIER_SHEET_MAP.items():
-        if sheet_name not in wb.sheetnames:
-            continue
-        ws = wb[sheet_name]
-        mapping = {}
-        for row in ws.iter_rows(min_row=8, max_row=50):
+    def _scan_rows(ws, min_row, max_row, skip_vals):
+        """C열(인덱스2)에서 모델명→행번호 매핑을 추출."""
+        m = {}
+        for row in ws.iter_rows(min_row=min_row, max_row=max_row):
             cell = row[2]
             val = cell.value
             if val and isinstance(val, str) and not val.startswith("=") \
-               and val not in ("모델명", "끝단가", "액단가"):
-                mapping[val] = cell.row
-        result[sheet_name] = mapping
+               and val not in skip_vals:
+                m[val] = cell.row
+        return m
 
+    result = {
+        "입력용": _scan_rows(wb["입력용"], 13, 59, {"모델명"}),
+    }
+    for sheet_name in CARRIER_SHEET_MAP.values():
+        if sheet_name in wb.sheetnames:
+            result[sheet_name] = _scan_rows(
+                wb[sheet_name], 8, 50, {"모델명", "끝단가", "액단가"}
+            )
     return result
 
 
@@ -340,8 +333,8 @@ def update_excel(wb: openpyxl.Workbook, all_extracted: list[dict],
 
         for carrier_key, carrier_data in carriers.items():
             carrier_key = carrier_key.upper()
-            # LG, LGU+, LGU 모두 LGU로 통일
-            if carrier_key in ("LG", "LGU+", "LG U+", "LGU+"):
+            # LG, LGU+, LGUP 등 변형 → LGU로 통일
+            if carrier_key in ("LG", "LGU+", "LGUP", "LG U+", "LG U"):
                 carrier_key = "LGU"
 
             models_data = carrier_data.get("models", [])
@@ -355,7 +348,7 @@ def update_excel(wb: openpyxl.Workbook, all_extracted: list[dict],
                 # ── A. 캐리어 합산단가 시트 업데이트 ──
                 if sheet_name and sheet_name in wb.sheetnames:
                     sheet_models = model_rows.get(sheet_name, {})
-                    matched = best_match(img_name, list(sheet_models.keys()))
+                    matched = best_match(img_name, sheet_models)
 
                     if matched:
                         row_num = sheet_models[matched]
@@ -387,7 +380,7 @@ def update_excel(wb: openpyxl.Workbook, all_extracted: list[dict],
                 gongsi_jiwon = item.get("gongsi_jiwon")
                 if gongsi_jiwon is not None:
                     ipyong_models = model_rows.get("입력용", {})
-                    matched_ip = best_match(img_name, list(ipyong_models.keys()))
+                    matched_ip = best_match(img_name, ipyong_models)
 
                     if matched_ip:
                         row_num = ipyong_models[matched_ip]
@@ -396,8 +389,9 @@ def update_excel(wb: openpyxl.Workbook, all_extracted: list[dict],
                         gongsi_col = col_map_ip.get("gongsi")
 
                         if gongsi_col is not None:
-                            old = ws_ip.cell(row=row_num, column=gongsi_col + 1).value
-                            ws_ip.cell(row=row_num, column=gongsi_col + 1).value = gongsi_jiwon
+                            cell_ip = ws_ip.cell(row=row_num, column=gongsi_col + 1)
+                            old = cell_ip.value
+                            cell_ip.value = gongsi_jiwon
                             log.append(
                                 f"[입력용] 행{row_num} {matched_ip} | "
                                 f"{carrier_key} gongsi_jiwon: {old} → {gongsi_jiwon}"
@@ -485,7 +479,8 @@ def main():
     else:
         # 원본 백업
         if output_path == args.template:
-            backup = args.template.replace(".xlsx", "_backup.xlsx")
+            tp = Path(args.template)
+            backup = str(tp.with_name(tp.stem + "_backup" + tp.suffix))
             shutil.copy2(args.template, backup)
             print(f"\n💾 원본 백업: {backup}")
 
