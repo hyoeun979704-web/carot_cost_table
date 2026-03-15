@@ -10,10 +10,11 @@ if errorlevel 1 (
 )
 
 if not exist ".env" (
-    echo [ERROR] .env file not found.
-    echo Please create .env file and set ANTHROPIC_API_KEY=sk-ant-...
-    pause
-    exit /b 1
+    echo ANTHROPIC_API_KEY=sk-ant-여기에_API키_입력> .env
+    echo .env file created. Opening for editing...
+    notepad .env
+    echo After saving, press any key to continue...
+    pause >nul
 )
 
 echo [2/3] Starting server...
