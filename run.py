@@ -16,10 +16,10 @@ def load_env():
         return False
     for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
         line = line.strip()
-        if line.startswith("ANTHROPIC_API_KEY="):
+        if line.startswith("GOOGLE_API_KEY="):
             key = line.split("=", 1)[1].strip()
             if key:
-                os.environ["ANTHROPIC_API_KEY"] = key
+                os.environ["GOOGLE_API_KEY"] = key
                 return True
     return False
 
@@ -32,11 +32,12 @@ def main():
     if not load_env():
         print()
         print("=" * 50)
-        print("ANTHROPIC_API_KEY not found.")
-        print("Enter your API key (sk-ant-...):")
+        print("GOOGLE_API_KEY not found.")
+        print("Get free key: https://aistudio.google.com/app/apikey")
+        print("Enter your Google API key:")
         key = input("> ").strip()
-        ENV_FILE.write_text(f"ANTHROPIC_API_KEY={key}\n", encoding="utf-8")
-        os.environ["ANTHROPIC_API_KEY"] = key
+        ENV_FILE.write_text(f"GOOGLE_API_KEY={key}\n", encoding="utf-8")
+        os.environ["GOOGLE_API_KEY"] = key
         print(".env file created.")
         print("=" * 50)
         print()

@@ -18,8 +18,6 @@
     python update_carrier_data.py all_carriers.png -t template.xlsx -o updated.xlsx
 """
 
-import anthropic
-import base64
 import json
 import sys
 import os
@@ -28,11 +26,13 @@ import argparse
 import shutil
 from pathlib import Path
 
+import google.generativeai as genai
+from PIL import Image
 import openpyxl
 
 
 # ─────────────────────────────────────────────
-# 1. 이미지 분석 — Claude Vision
+# 1. 이미지 분석 — Gemini Vision
 # ─────────────────────────────────────────────
 
 EXTRACT_PROMPT = """이 이미지는 통신사(SKT/KT/LG U+) 휴대폰 단가표입니다.
@@ -130,31 +130,12 @@ EXTRACT_PROMPT = """이 이미지는 통신사(SKT/KT/LG U+) 휴대폰 단가표
 """
 
 
-def encode_image(path: str) -> tuple[str, str]:
-    ext = Path(path).suffix.lower()
-    mime = {".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-            ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp"}
-    with open(path, "rb") as f:
-        return base64.standard_b64encode(f.read()).decode(), mime.get(ext, "image/jpeg")
-
-
-def analyze_image(client: anthropic.Anthropic, image_path: str) -> dict:
+def analyze_image(image_path: str) -> dict:
     print(f"  → 분석: {image_path}")
-    data, media_type = encode_image(image_path)
-
-    with client.messages.stream(
-        model="claude-opus-4-6",
-        max_tokens=8096,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64",
-                    "media_type": media_type, "data": data}},
-                {"type": "text", "text": EXTRACT_PROMPT},
-            ],
-        }],
-    ) as stream:
-        text = stream.get_final_message().content[0].text.strip()
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    img = Image.open(image_path)
+    response = model.generate_content([img, EXTRACT_PROMPT])
+    text = response.text.strip()
 
     if text.startswith("```"):
         text = "\n".join(text.split("\n")[1:-1])
@@ -432,12 +413,12 @@ def main():
         print(f"❌ 템플릿 파일 없음: {args.template}")
         sys.exit(1)
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        print("❌ ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.")
+        print("❌ GOOGLE_API_KEY 환경변수가 설정되지 않았습니다.")
         sys.exit(1)
 
-    client = anthropic.Anthropic(api_key=api_key)
+    genai.configure(api_key=api_key)
     output_path = args.output or args.template
 
     # 템플릿 로드
@@ -454,7 +435,7 @@ def main():
     print(f"\n🔍 이미지 분석 ({len(args.images)}개)...")
     all_extracted = []
     for img_path in args.images:
-        data = analyze_image(client, img_path)
+        data = analyze_image(img_path)
         all_extracted.append(data)
         carriers_found = list(data.get("carriers", {}).keys())
         print(f"    ✓ {img_path} — 통신사 감지: {carriers_found}")

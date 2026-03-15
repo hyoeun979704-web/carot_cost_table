@@ -18,7 +18,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
-import anthropic
+import google.generativeai as genai
 import openpyxl
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
@@ -54,15 +54,14 @@ def _run(job_id: str, image_paths: list[str], template_path: str) -> None:
         job["log"].append(msg)
 
     try:
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        api_key = os.environ.get("GOOGLE_API_KEY")
         if not api_key:
             raise RuntimeError(
-                "ANTHROPIC_API_KEY가 설정되지 않았습니다.\n"
-                "프로젝트 폴더에 .env 파일을 만들고 아래 내용을 입력하세요:\n"
-                "  ANTHROPIC_API_KEY=sk-ant-..."
+                "GOOGLE_API_KEY가 설정되지 않았습니다.\n"
+                ".env 파일에 GOOGLE_API_KEY=... 를 입력하세요."
             )
 
-        client = anthropic.Anthropic(api_key=api_key)
+        genai.configure(api_key=api_key)
 
         log(f"📂 템플릿 로드: {Path(template_path).name}")
         wb = openpyxl.load_workbook(template_path)
@@ -75,7 +74,7 @@ def _run(job_id: str, image_paths: list[str], template_path: str) -> None:
         all_extracted = []
         for path in image_paths:
             log(f"  → {Path(path).name}")
-            data = analyze_image(client, path)
+            data = analyze_image(path)
             all_extracted.append(data)
             carriers = list(data.get("carriers", {}).keys())
             log(f"    ✓ 통신사 감지: {carriers if carriers else '없음'}")
