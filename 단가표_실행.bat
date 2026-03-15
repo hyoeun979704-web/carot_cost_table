@@ -9,17 +9,15 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: .env 파일이 없으면 API 키 입력받아 생성
 if not exist "%~dp0.env" (
     echo.
     echo Enter your Anthropic API key (sk-ant-...):
     set /p APIKEY=^>
     (echo ANTHROPIC_API_KEY=%APIKEY%)> "%~dp0.env"
-    echo .env saved at %~dp0.env
+    echo .env file created.
     echo.
 )
 
-:: .env 에서 API 키를 읽어 환경변수로 설정
 for /f "usebackq tokens=1,* delims==" %%a in ("%~dp0.env") do (
     if "%%a"=="ANTHROPIC_API_KEY" set ANTHROPIC_API_KEY=%%b
 )
