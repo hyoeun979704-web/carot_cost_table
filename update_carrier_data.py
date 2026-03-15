@@ -26,7 +26,7 @@ import argparse
 import shutil
 from pathlib import Path
 
-import google.generativeai as genai
+from google import genai
 from PIL import Image
 import openpyxl
 
@@ -132,9 +132,12 @@ EXTRACT_PROMPT = """이 이미지는 통신사(SKT/KT/LG U+) 휴대폰 단가표
 
 def analyze_image(image_path: str) -> dict:
     print(f"  → 분석: {image_path}")
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
     img = Image.open(image_path)
-    response = model.generate_content([img, EXTRACT_PROMPT])
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[img, EXTRACT_PROMPT],
+    )
     text = response.text.strip()
 
     if text.startswith("```"):
@@ -418,7 +421,6 @@ def main():
         print("❌ GOOGLE_API_KEY 환경변수가 설정되지 않았습니다.")
         sys.exit(1)
 
-    genai.configure(api_key=api_key)
     output_path = args.output or args.template
 
     # 템플릿 로드

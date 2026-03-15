@@ -18,7 +18,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
-import google.generativeai as genai
 import openpyxl
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
@@ -61,7 +60,7 @@ def _run(job_id: str, image_paths: list[str], template_path: str) -> None:
                 ".env 파일에 GOOGLE_API_KEY=... 를 입력하세요."
             )
 
-        genai.configure(api_key=api_key)
+        os.environ["GOOGLE_API_KEY"] = api_key
 
         log(f"📂 템플릿 로드: {Path(template_path).name}")
         wb = openpyxl.load_workbook(template_path)
