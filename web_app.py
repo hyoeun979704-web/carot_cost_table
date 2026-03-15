@@ -16,7 +16,7 @@ import threading
 from pathlib import Path
 
 from dotenv import load_dotenv
-load_dotenv()  # 프로젝트 루트의 .env 파일 자동 로드
+load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 import anthropic
 import openpyxl
