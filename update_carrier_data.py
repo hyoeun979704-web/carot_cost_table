@@ -135,7 +135,7 @@ def analyze_image(image_path: str) -> dict:
     client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
     img = Image.open(image_path)
     response = client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash",
         contents=[img, EXTRACT_PROMPT],
     )
     text = response.text.strip()
