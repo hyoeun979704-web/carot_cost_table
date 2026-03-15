@@ -4,26 +4,35 @@ cd /d "%~dp0"
 echo [1/3] Installing packages...
 pip install -r requirements.txt -q
 if errorlevel 1 (
-    echo [ERROR] pip install failed. Check Python is installed.
+    echo [ERROR] pip install failed.
     pause
     exit /b 1
 )
 
-if not exist ".env" (
+:: .env 파일이 없으면 API 키 입력받아 생성
+if not exist "%~dp0.env" (
     echo.
-    echo ----------------------------------------
-    echo  API key not found.
-    echo  Enter your Anthropic API key below:
-    echo  (starts with sk-ant-...)
-    echo ----------------------------------------
-    set /p APIKEY=API Key:
-    echo ANTHROPIC_API_KEY=%APIKEY%> .env
-    echo .env file created.
+    echo Enter your Anthropic API key (sk-ant-...):
+    set /p APIKEY=^>
+    (echo ANTHROPIC_API_KEY=%APIKEY%)> "%~dp0.env"
+    echo .env saved at %~dp0.env
     echo.
 )
 
+:: .env 에서 API 키를 읽어 환경변수로 설정
+for /f "usebackq tokens=1,* delims==" %%a in ("%~dp0.env") do (
+    if "%%a"=="ANTHROPIC_API_KEY" set ANTHROPIC_API_KEY=%%b
+)
+
+if "%ANTHROPIC_API_KEY%"=="" (
+    echo [ERROR] ANTHROPIC_API_KEY not found in .env
+    pause
+    exit /b 1
+)
+
+echo API key loaded OK.
 echo [2/3] Starting server...
-start "" python web_app.py
+start "" python "%~dp0web_app.py"
 timeout /t 5 /nobreak >nul
 
 echo [3/3] Opening browser...
