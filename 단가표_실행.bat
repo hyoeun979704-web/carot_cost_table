@@ -1,26 +1,24 @@
 @echo off
 cd /d "%~dp0"
 
-:: 패키지 설치 확인
-echo [1/3] 필요 패키지 설치 중...
+echo [1/3] Installing packages...
 pip install -r requirements.txt -q
 if errorlevel 1 (
-    echo [오류] 패키지 설치 실패. Python/pip이 설치되어 있는지 확인하세요.
+    echo [ERROR] pip install failed. Check Python is installed.
     pause
     exit /b 1
 )
 
-:: .env 파일 존재 확인
 if not exist ".env" (
-    echo [오류] .env 파일이 없습니다.
-    echo .env.example 파일을 복사해서 .env 를 만들고 API 키를 입력하세요.
+    echo [ERROR] .env file not found.
+    echo Please create .env file and set ANTHROPIC_API_KEY=sk-ant-...
     pause
     exit /b 1
 )
 
-echo [2/3] 서버 시작 중...
+echo [2/3] Starting server...
 start "" python web_app.py
 timeout /t 5 /nobreak >nul
 
-echo [3/3] 브라우저 열기...
+echo [3/3] Opening browser...
 start "" http://localhost:8000
